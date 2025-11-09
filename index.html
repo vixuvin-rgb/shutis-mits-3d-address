@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="mn">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>3D — Rooms & Staff</title>
+
+  <style>
+    html,body{margin:0;height:100%;overflow:hidden;font-family:system-ui,Segoe UI,Arial}
+    body{-webkit-text-size-adjust:100%}
+
+    /* ✅ Canvas: утас/компьютер аль алинд нь өндөрт багтана, өргөн full-bleed */
+    #canvas3d{
+      width:100vw;            /* бүтэн өргөн (full-bleed) */
+      height:100svh;          /* мобайл real viewport өндөр */
+      aspect-ratio:16/9;
+      object-fit:contain;
+      margin:0 calc(50% - 50vw); /* контейнерийн padding-ийг үл тооцож бүрэн сунгана */
+      border-radius:16px;
+      display:block;
+    }
+
+    .badge{
+      position:fixed;left:10px;top:10px;background:#fff9;padding:6px 10px;
+      border-radius:10px;font:14px/1.2;z-index:20
+    }
+
+    .panel{
+      position:fixed;background:#ffffffcc;border:1px solid #e5e7eb;backdrop-filter:blur(6px);
+      padding:10px;border-radius:10px;box-shadow:0 10px 25px rgba(0,0,0,.08);font:14px/1.2;z-index:30
+    }
+    .row{display:flex;gap:8px;align-items:center;margin:6px 0}
+    .input,.ta{border:1px solid #cfd3d8;border-radius:10px;padding:8px 10px;font:14px/1.2 inherit}
+    .input{flex:1}
+    .ta{width:100%;height:120px;resize:vertical}
+    .btn{background:#2563eb;color:#fff;border:1px solid #2563eb;border-radius:10px;padding:8px 10px;cursor:pointer}
+    .ghost{background:#eef2ff;color:#1e40af;border-color:#c7d2fe}
+    .danger{background:#fee2e2;color:#991b1b;border-color:#fecaca}
+
+    /* 🔍 Хайлтын панел — бүтэн өргөн, canvas-ын эвентыг хаахгүй */
+    .search-panel{
+      position:fixed; top:0; left:0; right:0; width:100%;
+      max-height:85vh; overflow:auto; background:#fff; z-index:1000;
+      padding:10px; box-shadow:0 2px 10px rgba(0,0,0,.1); border-bottom:1px solid #e5e7eb;
+      pointer-events:none;   /* панел өөрөө эвент авахгүй */
+    }
+    .search-panel *{ pointer-events:auto; } /* харин дотрох элементүүд ажиллана */
+    /* Хайлтын мөрийг нэг мөрөнд багтаах */
+    .search-panel .row{display:flex;align-items:center;gap:8px}
+    .search-panel input{min-width:0;flex:1}
+
+    .result{margin-top:10px;padding:8px;border-radius:8px;border:1px solid #e2e8f0;background:#f8fafc}
+    .res-item{padding:6px;border-radius:8px;border:1px solid #e5e7eb;margin-bottom:6px;background:#fff;cursor:pointer}
+    .res-item:hover{background:#eef2ff}
+    .res-title{font-weight:700;font-size:10px;line-height:1.2}
+    .res-title .degree{font-weight:800;margin-left:8px;white-space:nowrap}
+    .res-sub{font-size:10px;color:#475569}
+
+    :root{ --roomH: 40svh; }          /* хүсвэл 35svh/30svh болгож болно */
+
+.room-panel{
+  position:fixed; left:0; right:0; bottom:0; width:100%;
+  height:var(--roomH);             /* ✅ тогтмол өндөр */
+  max-height:var(--roomH);
+  overflow:auto;
+  background:#fff; padding:10px;
+  box-shadow:0 -2px 10px rgba(0,0,0,.1);
+  border-top:1px solid #e5e7eb; z-index:1000;
+}
+
+    /* ======= Compact (утас) ======= */
+    @media (max-width:600px){
+      :root{ --fz:13px; --pad:8px; }
+      html{ font-size:var(--fz); }
+      .search-panel, .room-panel{ padding:var(--pad); }
+
+      .input,.ta{ padding:6px 8px; font-size:var(--fz); }
+      .btn{ padding:6px 10px; font-size:var(--fz); }
+
+      /* Гарчигнуудыг нууж зай хэмнэх */
+      .search-panel h3,
+      #roomPanel h3:first-child,            /* "Өрөөний мэдээлэл" */
+      #roomPanel h3:nth-of-type(2){         /* "Тухайн өрөөнд..." */
+        display:none;
+      }
+
+      /* Label-уудыг нууж, зөвхөн placeholder үлдээнэ */
+      #roomPanel .row > label{ display:none; }
+      #roomPanel .row{ gap:8px; }
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="canvas3d"></canvas>
+<div class="badge">Mouse: эргүүлэх • Wheel: том/жижиг • Shift+drag: зөөх</div>
+
+<!-- 🔍 Хайлт -->
+<div class="panel search-panel">
+  <h3>🔍 Хайлт</h3>
+  <div class="row">
+    <input id="searchBox" class="input" placeholder="Өрөө (ID/code) эсвэл багш (овог/нэр)..." />
+    <button class="btn" id="doSearch">Хайх</button>
+  </div>
+  <div id="searchResults" class="result"></div>
+</div>
+
+<!-- 🏠 Өрөө панел -->
+<div class="panel room-panel" id="roomPanel">
+  <h3>Өрөөний мэдээлэл</h3>
+  <div class="row">
+    <label style="width:74px">Name:</label>
+    <input id="r_name" class="input" placeholder="Name" aria-label="Name">
+  </div>
+  <div class="row">
+    <label style="width:74px">ID:</label>
+    <input id="r_id" class="input" placeholder="ID" aria-label="ID">
+  </div>
+  <div class="row">
+    <label style="width:74px">Dept:</label>
+    <input id="r_dept" class="input" placeholder="Dept" aria-label="Dept">
+  </div>
+
+  <h3 style="margin-top:10px">Тухайн өрөөнд ажилладаг хүмүүс</h3>
+  <div id="roomStaffList" class="result" style="max-height:180px;overflow:auto">
+    <i>Ажилтан байхгүй.</i>
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from "./three.module.js";
+import { OrbitControls } from "./OrbitControls.js";
+
+/* ---------- THREE setup ---------- */
+const canvas   = document.getElementById("canvas3d");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:true });
+renderer.setPixelRatio(devicePixelRatio);
+
+const scene  = new THREE.Scene();
+scene.background = new THREE.Color(0xffffff);
+const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 2000);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.dampingFactor = 0.08;
+controls.enablePan = true; controls.panSpeed = 0.8;
+controls.enableZoom = true; controls.zoomSpeed = 0.25;
+controls.minDistance = 3; controls.maxDistance = 150;
+controls.minPolarAngle = 0.1; controls.maxPolarAngle = Math.PI * 0.48;
+controls.rotateSpeed = 0.6;
+if ("zoomToCursor" in controls) controls.zoomToCursor = true;
+
+/* Lights */
+scene.add(new THREE.AmbientLight(0xffffff, .7));
+const dl = new THREE.DirectionalLight(0xffffff, .7); dl.position.set(5,10,8); scene.add(dl);
+
+/* Grid */
+const grid = new THREE.GridHelper(18, 18, 0x90a4ae, 0xe0e0e0);
+grid.position.set(-4 + 18/2, -0.01, -16.5 + 18/2); scene.add(grid);
+
+/* Groups */
+const root = new THREE.Group(); scene.add(root);
+const roomsGroup  = new THREE.Group(); root.add(roomsGroup);
+const floorsGroup = new THREE.Group(); root.add(floorsGroup);
+const modelsGroup = new THREE.Group(); root.add(modelsGroup);
+
+/* Materials */
+const EDGE_NORMAL    = new THREE.LineBasicMaterial({color:0x1f2937, transparent:true, opacity:.6});
+const EDGE_TOILET    = new THREE.LineBasicMaterial({color:0x38bdf8, transparent:true, opacity:.9});
+const MAT_HIGHLIGHT  = new THREE.MeshStandardMaterial({color:0xFFC20E, roughness:.8, transparent:true, opacity:.45});
+
+/* State */
+const state = { items: [], roomMeshes: new Map(), selected: null, selectedMany: [] };
+
+/* ---------- Load Data.json ---------- */
+const data = await (await fetch("./Data.json")).json();
+state.items = Array.isArray(data) ? data : (Array.isArray(data.items) ? data.items : []);
+if (!state.items.length) console.warn("Data.json хоосон эсвэл items массив биш байна.");
+
+/* Build scene from items */
+for (const it of state.items) {
+  if (it.type === "mesh") {
+    const g = new THREE.BufferGeometry();
+    if (Array.isArray(it.vertices) && typeof it.vertices[0] === "number") {
+      g.setAttribute("position", new THREE.Float32BufferAttribute(it.vertices, 3));
+    } else {
+      const flat = []; (it.vertices||[]).forEach(v=>{ flat.push(v[0],v[1],v[2]); });
+      g.setAttribute("position", new THREE.Float32BufferAttribute(flat, 3));
+    }
+    if (it.indices && it.indices.length) g.setIndex(it.indices);
+    g.computeVertexNormals();
+    const mat = new THREE.MeshStandardMaterial();
+    if ("color" in it)       mat.color.set(it.color);
+    if ("metalness" in it)   mat.metalness  = it.metalness;
+    if ("roughness" in it)   mat.roughness  = it.roughness;
+    if ("wireframe" in it)   mat.wireframe  = !!it.wireframe;
+    if ("doubleSided" in it) mat.side       = it.doubleSided ? THREE.DoubleSide : THREE.FrontSide;
+    if ("opacity" in it) { mat.opacity = it.opacity; mat.transparent = it.opacity < 1; }
+    const mesh = new THREE.Mesh(g, mat);
+    if (it.position) mesh.position.fromArray(it.position);
+    if (it.rotation) mesh.rotation.set(it.rotation[0], it.rotation[1], it.rotation[2]);
+    if (it.scale)    mesh.scale.fromArray(it.scale);
+    modelsGroup.add(mesh);
+    continue;
+  }
+
+  if (it.type === "floor" && it.w && it.h && it.d) {
+    const geo = new THREE.BoxGeometry(it.w, it.h, it.d);
+    const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo), EDGE_NORMAL);
+    edges.position.set(it.x || 0, (it.y || 0) + it.h/2, it.z || 0);
+    floorsGroup.add(edges);
+    continue;
+  }
+
+  if (it.type !== "floor" && it.w && it.h && it.d) {
+    const geo = new THREE.BoxGeometry(it.w, it.h, it.d);
+    const edgeMat = (it.type === "toilet") ? EDGE_TOILET : EDGE_NORMAL;
+    const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo), edgeMat);
+    const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({visible:false}));
+    edges.position.set(it.x || 0, (it.y || 0) + it.h/2, it.z || 0);
+    mesh.position.copy(edges.position);
+    mesh.userData.info = it;
+    roomsGroup.add(mesh); roomsGroup.add(edges);
+    const id = it.id || it.code || `room_${roomsGroup.children.length}`;
+    state.roomMeshes.set(id, {mesh, edges, info: it});
+  }
+}
+
+/* Camera start */
+camera.position.set(13, 9, 4);
+controls.target.set(4, -4.06, -6.09);
+controls.update();
+
+/* ✅ Renderer/Cam size = canvas rect */
+function resizeToCanvas(){
+  const rect = canvas.getBoundingClientRect();
+  const w = Math.max(1, Math.floor(rect.width || innerWidth));
+  const h = Math.max(1, Math.floor(rect.height|| innerHeight));
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+
+/* ✅ Canvas өндөр = үлдсэн зайгаар динамик */
+function layoutCanvas(){
+  const topEl = document.querySelector('.search-panel');
+  const bottomEl = document.getElementById('roomPanel');
+
+  const top    = topEl ? topEl.offsetHeight : 0;
+  const bottom = bottomEl ? bottomEl.offsetHeight : 0;
+
+  const vh = (window.visualViewport?.height ?? window.innerHeight);
+  const h = Math.max(220, vh - top - bottom);
+
+  const canvas = document.getElementById('canvas3d');
+  canvas.style.height = h + 'px';
+
+  // ✅ ШИНЭ: дээд панелын хэмжээгээр canvas-ийг доош нь байрлуулна
+  canvas.style.marginTop = top + 'px';
+  // ✅ Сонголт: доод панелд даруулчихгүйн тулд доор нь “buffer” тавьж болно
+  canvas.style.marginBottom = bottom + 'px';
+
+  resizeToCanvas();
+}
+
+function collapseSearch(){
+  // үр дүнг хоослоод (өндөр багасна), фокусыг алга болгоно
+  const res = document.getElementById('searchResults');
+  const inp = document.getElementById('searchBox');
+  if (res) res.innerHTML = "";
+  if (inp) inp.blur();
+  layoutCanvas(); // өндөр дахин тооцоолно
+}
+layoutCanvas();
+addEventListener('resize', layoutCanvas);
+
+/* Picking / hover / click */
+const ray = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+
+renderer.domElement.addEventListener('pointermove', (ev)=>{
+  const rect = renderer.domElement.getBoundingClientRect();
+  pointer.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
+  pointer.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
+  ray.setFromCamera(pointer, camera);
+});
+
+let downXY = null, dragged = false;
+renderer.domElement.addEventListener('pointerdown', (ev)=>{ downXY = [ev.clientX, ev.clientY]; dragged = false; });
+renderer.domElement.addEventListener('pointermove', (ev)=>{ if (!downXY) return; const dx = ev.clientX - downXY[0]; const dy = ev.clientY - downXY[1]; if (Math.hypot(dx, dy) > 5) dragged = true; });
+renderer.domElement.addEventListener('pointerup', (ev)=>{
+  if (dragged) return;
+  const rect = renderer.domElement.getBoundingClientRect();
+  pointer.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
+  pointer.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
+  ray.setFromCamera(pointer, camera);
+  const meshes = roomsGroup.children.filter(o=>o.isMesh);
+  const hit = ray.intersectObjects(meshes, true)[0];
+  if(!hit){ highlight(null); showRoomPanel(null); return; }
+  const m = hit.object;
+  highlight(m);
+  showRoomPanel(m.userData.info);
+});
+
+/* Highlight helpers */
+const pulse = { t: 0, speed: 0.1, amp: 0.04 };
+function findEntryByMesh(mesh){ for(const [id, e] of state.roomMeshes){ if(e.mesh===mesh) return e; } return null; }
+function clearHighlights(){
+  if (state.selected){
+    const prev = findEntryByMesh(state.selected);
+    if (prev && prev.edges) prev.edges.scale.set(1,1,1);
+    state.selected.scale.set(1,1,1);
+    state.selected.material = new THREE.MeshBasicMaterial({visible:false});
+    state.selected = null;
+  }
+  (state.selectedMany||[]).forEach(m=>{
+    const ent = findEntryByMesh(m);
+    if (ent && ent.edges) ent.edges.scale.set(1,1,1);
+    m.scale.set(1,1,1);
+    m.material = new THREE.MeshBasicMaterial({visible:false});
+  });
+  state.selectedMany = [];
+  roomsGroup.traverse(o=>{ if (o.isMesh) o.material = new THREE.MeshBasicMaterial({visible:false}); });
+}
+function highlight(mesh){
+  clearHighlights();
+  state.selected = mesh || null; if (!mesh) return;
+  roomsGroup.traverse(o=>{ if(!o.isMesh) return; o.material = (o===mesh) ? MAT_HIGHLIGHT : new THREE.MeshBasicMaterial({visible:false}); });
+  pulse.t = 0;
+}
+function highlightRooms(ids=[], fitAll=true){
+  clearHighlights();
+  const meshes = [];
+  ids.forEach(id=>{
+    const ent = state.roomMeshes.get(id);
+    if(ent){ ent.mesh.material = MAT_HIGHLIGHT; meshes.push(ent.mesh); }
+  });
+  state.selectedMany = meshes;
+  if (fitAll && meshes.length){
+    const box = new THREE.Box3(); meshes.forEach(m=>box.expandByObject(m));
+    const size = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+    const maxSize = Math.max(size.x,size.y,size.z) || 1;
+    const dist = maxSize * 0.9;
+    camera.position.copy(center.clone().add(new THREE.Vector3(dist, dist*0.8, dist)));
+    controls.target.copy(center); controls.update();
+  }
+  pulse.t = 0;
+}
+
+/* Room panel (минимал) */
+const panel = document.getElementById('roomPanel');
+const E = (id)=>document.getElementById(id);
+
+function showRoomPanel(info){
+  // ✅ Панелийг хэзээ ч нуухгүй, тогтмол 40% өндөртэй хэвээр
+  panel.style.display = 'block';
+
+  if(!info){
+    E('r_name').value = '';
+    E('r_id').value   = '';
+    E('r_dept').value = '';
+    document.getElementById('roomStaffList').innerHTML = '<i>Өрөө сонгоно уу.</i>';
+    layoutCanvas();                    // доод өндөр тогтмол тул reflow бага
+    return;
+  }
+
+  // сонгосон үед утгуудыг бөглөнө
+  E('r_name').value = info.name || '';
+  E('r_id').value   = info.id   || '';
+  E('r_dept').value = info.dept || info.department || '';
+  renderRoomStaff(info.id || '');
+  layoutCanvas();
+}
+
+/* Staff list render */
+let staff = Array.isArray(data.staff) ? data.staff : [];
+if (!staff.length) { try { staff = JSON.parse(localStorage.getItem('staff_entries') || '[]'); } catch {} }
+const roomsOf = (s)=> Array.isArray(s.rooms) ? s.rooms.filter(Boolean) : (s.room ? [s.room] : []);
+function renderRoomStaff(roomId){
+  const box = document.getElementById('roomStaffList'); if(!box) return;
+  const list = (staff||[]).filter(s => roomsOf(s).includes((roomId||'').trim()));
+  if(!list.length){ box.innerHTML = "<i>Ажилтан байхгүй.</i>"; return; }
+  box.innerHTML = "";
+  list.forEach((s)=>{
+    const el = document.createElement('div');
+    el.className='res-item';
+    const name = `${s.family_name||''} ${s.given_name||''}`.trim() || '(нэргүй)';
+    const degree = s.title ? ` <span style="font-weight:700">/${s.title}/</span>` : '';
+    el.innerHTML = `
+      <div class="res-title" style="font-weight:700;font-size:16px">${name}${degree}</div>
+      <div class="res-sub" style="color:#475569;margin-bottom:6px">
+        ${(s.dept||'')} • ${(s.position||'')}${s.phone?(' • '+s.phone):''}
+      </div>
+      <div class="res-sub" style="margin:4px 0 8px 0">Өрөө(нүүд): ${roomsOf(s).join(', ')||'-'}</div>`;
+    box.appendChild(el);
+// ✅ “Өрөөнд ажилладаг хүмүүс” → хүн дээр дарахад
+el.style.cursor = 'pointer';
+el.setAttribute('role', 'button');
+el.tabIndex = 0;
+
+el.addEventListener('click', ()=>{
+  const r = roomsOf(s);
+  if (!r || !r.length) return;
+  // Хайлтын хүн дээр дардгийн адил: бүх өрөөг highlight, камер ХӨДӨЛГӨХГҮЙ
+  highlightRooms(r, false);
+  const ent = state.roomMeshes.get(r[0]);
+  if (ent) showRoomPanel(ent.info);
+});
+
+// (сонголтоор — Enter дарахад бас ажиллуулъя)
+el.addEventListener('keydown', (e)=>{
+  if (e.key === 'Enter' || e.key === ' ') el.click();
+});
+
+  });
+}
+
+/* Search (өрөө + staff) */
+const resBox = document.getElementById('searchResults');
+document.getElementById('doSearch').addEventListener('click', onSearch);
+document.getElementById('searchBox').addEventListener('keydown',(e)=>{ if(e.key==='Enter') onSearch(); });
+
+function onSearch(){
+  const q = document.getElementById('searchBox').value.trim().toLowerCase();
+  resBox.innerHTML = ""; if(!q) { layoutCanvas(); return; }
+  const results = [];
+  for(const r of state.items.filter(x=>x.type==='room')){
+    const text = JSON.stringify(r).toLowerCase();
+    if(text.includes(q)) results.push({kind:'room', id:r.id, title:r.name||r.code||'(өрөө)', sub:`өрөөний дугаар: ${r.id||'-'}`});
+  }
+  for (const s of staff){
+    const nameFull = `${s.family_name||''} ${s.given_name||''}`.trim();
+    const all = (nameFull+" "+(s.title||"")+" "+(s.position||"")+" "+(s.dept||"")+" "+(s.room||s.rooms||"")).toLowerCase();
+    if (all.includes(q)){
+      results.push({kind:'staff', id: roomsOf(s)[0]||null, rooms: roomsOf(s),
+        name: nameFull || '(нэргүй)', degree: s.title || '',
+        sub: `${s.dept||''} • ${s.position||''} • өрөө: ${roomsOf(s).join(', ')||'-'}`});
+    }
+  }
+  if(!results.length){ resBox.innerHTML = "<i>Үр дүн олдсонгүй.</i>"; layoutCanvas(); return; }
+
+  const escapeHTML=(t)=> (t||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  for (const r of results){
+    const div = document.createElement('div'); div.className='res-item';
+    const degreeHTML = (r.kind==='staff' && r.degree) ? ` <span class="degree">/${escapeHTML(r.degree)}/</span>` : '';
+    const titleHTML  = (r.kind==='staff') ? escapeHTML(r.name)+degreeHTML : escapeHTML(r.title);
+    div.innerHTML = `<div class="res-title">${titleHTML}</div><div class="res-sub">${escapeHTML(r.sub)}</div>`;
+    div.addEventListener('click', ()=>{
+  if (r.kind==='staff' && r.rooms && r.rooms.length){
+  highlightRooms(r.rooms, false);      // ✅ бүх өрөөг нэг дор highlight
+  const first = r.rooms[0];
+  const ent = state.roomMeshes.get(first);
+  if (ent) showRoomPanel(ent.info);
+}
+ else if (r.id){
+    const ent = state.roomMeshes.get(r.id);
+    if(!ent) return;
+    highlight(ent.mesh);                  // зөвхөн highlight
+    showRoomPanel(ent.info);
+  }
+  collapseSearch();                       // ✅ сонгосны дараа хайлтыг хаа
+});
+    resBox.appendChild(div);
+  }
+  layoutCanvas(); // хайлтын үр дүнгийн өндөрт тааруулна
+}
+
+/* Animate */
+function animate(){ requestAnimationFrame(animate); controls.update();
+  if(state.selected){
+    pulse.t += pulse.speed; const s = 1 + pulse.amp * Math.sin(pulse.t);
+    state.selected.scale.set(s,s,s); const cur = findEntryByMesh(state.selected); if(cur && cur.edges) cur.edges.scale.set(s,s,s);
+  }
+  if(state.selectedMany && state.selectedMany.length){
+    pulse.t += pulse.speed; const s = 1 + pulse.amp * Math.sin(pulse.t);
+    state.selectedMany.forEach(m=>{ m.scale.set(s,s,s); const ent = findEntryByMesh(m); if(ent && ent.edges) ent.edges.scale.set(s,s,s); });
+  }
+  renderer.render(scene, camera);
+}
+animate();
+</script>
+
+<!-- Hover tooltip (хэрэв хэрэгтэй бол үлдээсэн) -->
+<div id="hoverTip" style="position:fixed;left:-9999px;top:-9999px;z-index:200;background:#111827;color:#f1f5f9;border:1px solid #334155;padding:4px 8px;border-radius:6px;font:24px/1.2 system-ui;pointer-events:none;opacity:0;transition:.12s;"></div>
+</body>
+</html>
