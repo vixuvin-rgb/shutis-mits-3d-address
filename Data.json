@@ -43,8 +43,7 @@
 {"id": "7-114","type": "room","code": "114","x": 10.25,"y": 0,"z": -6.5,"w": 3.5,"d": 2,"h": 2,"floor": null,"name": "Спортын танхим","tags": ["gym","sport","hall"]},
 {"id": "7-115","type": "room","code": "115","x": 8,"y": 0,"z": -7.25,"w": 1,"d": 0.5,"h": 1,"floor": null,"name": "Биеийн тамирын багш нарын өрөө","tags": ["office","teacher","pe"]},
 {"id": "7-Zaalnii urd heseg","type": "corridor","code": null,"x": 8,"y": 0,"z": -6.25,"w": 1,"d": 1.5,"h": 1,"floor": null},
-{"id": "7-111a","type": "room","code": "111a","x": 4.25,"y": 0,"z": -6,"w": 0.5,"d": 1,"h": 1,"floor": null,"name": "Механик, мехатроникийн тэнхимийн багш нарын өрөө","tags": ["office","teachers"]},
-{"id": "7-111b","type": "room","code": "111","x": 4.5,"y": 0,"z": -7,"w": 1,"d": 1,"h": 1,"floor": null,"name": "МЕХАТРОНИК, МАШИНЫ ЭЛЕКТРОН СИСТЕМИЙН ЛАБОРАТОРИ","tags": ["lab","mechatronics"]},
+{"id": "7-111","type": "room","code": "111","x": 4.5,"y": 0,"z": -6.5,"w": 1,"d": 2,"h": 1,"floor": null,"name": "МЕХАТРОНИК, МАШИНЫ ЭЛЕКТРОН СИСТЕМИЙН ЛАБОРАТОРИ","tags": ["lab","mechatronics"]},
 {"id": "7-112","type": "room","code": "112","x": 5.375,"y": 0,"z": -6.5,"w": 0.75,"d": 2,"h": 1,"floor": null,"name": "CAD/CAM/CAE лаборатори","tags": ["lab","cadcam"]},
 {"id": "cafe","type": "room","code": null,"x": 6.125,"y": 0,"z": -6.5,"w": 0.75,"d": 2,"h": 1,"floor": null,"name": "Цайны газар","tags": ["cafe"]},
 {"id": "cafe_staff","type": "room","code": null,"x": 6.75,"y": 0,"z": -7.25,"w": 0.5,"d": 0.5,"h": 1,"floor": null},
@@ -242,6 +241,8 @@
   {"family_name": "Э.","given_name": "БАТЖАРГАЛ","title": "Магистр","position": "Сургалтын мастер","dept": "ТЭЭВЭР, ЛОГИСТИКИЙН ТЭНХИМ","rooms": ["7-126a","7-126b","7-126w","7-126e","7-126yo","7-127","7-128","7-134"]},
   {"family_name": "Э.","given_name": "ДААРИЙМАА","title": "Доктор (Ph.D)","position": "Ахлах багш","dept": "ТЭЭВЭР, ЛОГИСТИКИЙН ТЭНХИМ","rooms": ["7-302a"]},
   {"family_name": "Э.","given_name": "УУГАНБАЯР","title": "Магистр","position": "Дадлагажигч багш","dept": "ТЭЭВЭР, ЛОГИСТИКИЙН ТЭНХИМ","rooms": ["7-215"]},
+  {"family_name": "Д.","given_name": "ГАНБАТ","title": "Доктор (Ph.D), дэд профессор","position": "","dept": "МЕХАНИК, МЕХАТРОНИКИЙН ТЭНХИМ","rooms": ["7-111"]},
+  {"family_name": "Б.","given_name": "ДОНДОГЖАМЦ","title": "Доктор (Ph.D)","position": "","dept": "МЕХАНИК, МЕХАТРОНИКИЙН ТЭНХИМ","rooms": ["7-111"]},
   {"family_name": "Ү.","given_name": "ЖАМСРАН","title": "Магистр","position": "Багш","dept": "ТЭЭВЭР, ЛОГИСТИКИЙН ТЭНХИМ","rooms": ["7-215"]}
 ]
 }
